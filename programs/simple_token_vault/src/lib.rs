@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{self, Token, TokenAccount, Transfer};
 
-declare_id!("FhS7jbiQLyDoWGyBmrxbAriedhN6H6vpCq4E26sU9Hvt");
+declare_id!("2dftvFuYB5H7GFKerZUESaiN6pvqXJgFuqMcQkf6q5ZP");
 
 #[program]
 pub mod simple_token_vault {

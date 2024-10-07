@@ -25,6 +25,7 @@ describe('simple_token_vault', () => {
   let vaultPda: PublicKey
   let vaultBump: number
   let vaultTokenAccount: PublicKey
+  let userTokenAccount: PublicKey
 
   before(async () => {
     mint = await createMint(
@@ -33,38 +34,46 @@ describe('simple_token_vault', () => {
       wallet.publicKey,
       null,
       9
+    );
+
+    [vaultPda, vaultBump] = await PublicKey.findProgramAddress(
+      [Buffer.from('vault')],
+      program.programId
     )
-      ;[vaultPda, vaultBump] = await PublicKey.findProgramAddress(
-        [Buffer.from('vault')],
-        program.programId
-      )
+
+    userTokenAccount = await createAssociatedTokenAccount(
+      provider.connection,
+      wallet.payer,
+      mint,
+      wallet.publicKey
+    )
   })
 
-  // it("Initializes the vault", async () => {
-  //   try {
-  //     await program.methods
-  //       .initialize(new anchor.BN(fee))
-  //       .accounts({
-  //         vault: vaultPda,
-  //         owner: wallet.publicKey,
-  //         tokenMint: mint,
-  //         systemProgram: SystemProgram.programId,
-  //       })
-  //       .rpc();
+  it("Initializes the vault", async () => {
+    try {
+      await program.methods
+        .initialize(new anchor.BN(fee))
+        .accounts({
+          vault: vaultPda,
+          owner: wallet.publicKey,
+          tokenMint: mint,
+          systemProgram: SystemProgram.programId,
+        })
+        .rpc();
 
-  //     const vaultAccount = await program.account.vault.fetch(vaultPda);
+      const vaultAccount = await program.account.vault.fetch(vaultPda);
 
-  //     assert.isTrue(vaultAccount.owner.equals(wallet.publicKey), "Vault owner should match");
-  //     assert.isTrue(vaultAccount.tokenMint.equals(mint), "Token mint should match");
-  //     assert.equal(vaultAccount.fee.toNumber(), fee, "Fee should match");
-  //     assert.equal(vaultAccount.bump, vaultBump, "Bump should match");
+      assert.isTrue(vaultAccount.owner.equals(wallet.publicKey), "Vault owner should match");
+      assert.isTrue(vaultAccount.tokenMint.equals(mint), "Token mint should match");
+      assert.equal(vaultAccount.fee.toNumber(), fee, "Fee should match");
+      assert.equal(vaultAccount.bump, vaultBump, "Bump should match");
 
-  //     console.log("Vault initialized successfully!");
-  //   } catch (error) {
-  //     console.error("Error initializing vault:", error);
-  //     throw error;
-  //   }
-  // });
+      console.log("Vault initialized successfully!");
+    } catch (error) {
+      console.error("Error initializing vault:", error);
+      throw error;
+    }
+  });
 
   it('Deposits tokens into the existing vault', async () => {
     try {
@@ -82,12 +91,7 @@ describe('simple_token_vault', () => {
       )
 
       // Create user token account
-      const userTokenAccount = await createAssociatedTokenAccount(
-        provider.connection,
-        wallet.payer,
-        mint,
-        wallet.publicKey
-      )
+
 
       // Mint tokens to user
       const depositAmount = 10000000000 // 10 token (assuming 9 decimals)
@@ -149,5 +153,39 @@ describe('simple_token_vault', () => {
       console.error('Error:', error)
       throw error
     }
+  })
+
+  it('Withdraws tokens from the vault', async () => {
+    const [userDepositPda] = await PublicKey.findProgramAddress(
+      [
+        Buffer.from('user_deposit'),
+        vaultPda.toBuffer(),
+        wallet.publicKey.toBuffer()
+      ],
+      program.programId
+    )
+
+    const vaultAccount = await program.account.vault.fetch(vaultPda);
+    const userDepositAccountBefore = await program.account.userDeposit.fetch(userDepositPda);
+    const vaultTokenAccountInfoBefore = await provider.connection.getTokenAccountBalance(vaultTokenAccount);
+    const userTokenAccountInfoBefore = await provider.connection.getTokenAccountBalance(userTokenAccount);
+
+    const withdrawAmount = 1000000000; // 5 tokens (assuming 9 decimals)
+    const feeAmount = Math.floor(withdrawAmount * vaultAccount.fee.toNumber() / 10000);
+    const expectedWithdrawAmount = withdrawAmount - feeAmount;
+
+    const txWithdraw = await program.methods
+      .withdraw(new anchor.BN(withdrawAmount))
+      .accounts({
+        vault: vaultPda,
+        userDeposit: userDepositPda,
+        user: wallet.publicKey,
+        userTokenAccount: userTokenAccount,
+        vaultTokenAccount: vaultTokenAccount,
+        feeAccount: userTokenAccount,
+        tokenProgram: TOKEN_PROGRAM_ID,
+      })
+      .rpc();
+    console.log('Withdraw transaction:', txWithdraw);
   })
 })
