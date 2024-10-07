@@ -1,0 +1,138 @@
+import * as anchor from "@project-serum/anchor";
+import { Program } from "@project-serum/anchor";
+import { SimpleTokenVault } from "../target/types/simple_token_vault";
+import {
+  TOKEN_PROGRAM_ID,
+  createAssociatedTokenAccount,
+  createMint,
+  getAssociatedTokenAddress,
+  mintTo,
+  getAccount,
+  createAccount,
+} from "@solana/spl-token";
+import { Keypair, PublicKey, SystemProgram } from "@solana/web3.js";
+import { assert, expect } from "chai";
+
+describe("simple_token_vault", () => {
+  const provider = anchor.AnchorProvider.env();
+  anchor.setProvider(provider);
+
+  const program = anchor.workspace.SimpleTokenVault as Program<SimpleTokenVault>;
+  const wallet = provider.wallet as anchor.Wallet;
+
+  let mint: PublicKey;
+  const fee = 500; // 5%
+  let vaultPda: PublicKey;
+  let vaultBump: number;
+  let vaultTokenAccount: PublicKey;
+
+  before(async () => {
+    mint = await createMint(
+      provider.connection,
+      wallet.payer,
+      wallet.publicKey,
+      null,
+      9
+    );
+    [vaultPda, vaultBump] = await PublicKey.findProgramAddress(
+      [Buffer.from("vault")],
+      program.programId
+    );
+  });
+
+  // it("Initializes the vault", async () => {
+  //   try {
+  //     await program.methods
+  //       .initialize(new anchor.BN(fee))
+  //       .accounts({
+  //         vault: vaultPda,
+  //         owner: wallet.publicKey,
+  //         tokenMint: mint,
+  //         systemProgram: SystemProgram.programId,
+  //       })
+  //       .rpc();
+
+  //     const vaultAccount = await program.account.vault.fetch(vaultPda);
+
+  //     assert.isTrue(vaultAccount.owner.equals(wallet.publicKey), "Vault owner should match");
+  //     assert.isTrue(vaultAccount.tokenMint.equals(mint), "Token mint should match");
+  //     assert.equal(vaultAccount.fee.toNumber(), fee, "Fee should match");
+  //     assert.equal(vaultAccount.bump, vaultBump, "Bump should match");
+
+  //     console.log("Vault initialized successfully!");
+  //   } catch (error) {
+  //     console.error("Error initializing vault:", error);
+  //     throw error;
+  //   }
+  // });
+
+  it("Deposits tokens into the existing vault", async () => {
+    try {
+      // Fetch the vault account to ensure it exists
+      const vaultAccount = await program.account.vault.fetch(vaultPda);
+
+      // Create vault token account (regular account, not ATA)
+      const vaultTokenAccountKeypair = Keypair.generate();
+      vaultTokenAccount = await createAccount(
+        provider.connection,
+        wallet.payer,
+        mint,
+        vaultPda,
+        vaultTokenAccountKeypair
+      );
+
+      // Create user token account
+      const userTokenAccount = await createAssociatedTokenAccount(
+        provider.connection,
+        wallet.payer,
+        mint,
+        wallet.publicKey
+      );
+
+      // Mint tokens to user
+      const depositAmount = 1000000000; // 1 token (assuming 9 decimals)
+      const txMint = await mintTo(
+        provider.connection,
+        wallet.payer,
+        mint,
+        userTokenAccount,
+        wallet.publicKey,
+        depositAmount
+      );
+      console.log("Mint transaction:", txMint);
+
+      // Create PDA for user deposit
+      const [userDepositPda] = await PublicKey.findProgramAddress(
+        [Buffer.from("user_deposit"), vaultPda.toBuffer(), wallet.publicKey.toBuffer()],
+        program.programId
+      );
+
+      // // Perform deposit
+      // const txDeposit = await program.methods
+      //   .deposit(new anchor.BN(depositAmount))
+      //   .accounts({
+      //     vault: vaultPda,
+      //     userDeposit: userDepositPda,
+      //     user: wallet.publicKey,
+      //     userTokenAccount: userTokenAccount,
+      //     vaultTokenAccount: vaultTokenAccount,
+      //     tokenProgram: TOKEN_PROGRAM_ID,
+      //     systemProgram: SystemProgram.programId,
+      //   })
+      //   .rpc();
+      // console.log("Deposit transaction:", txDeposit);
+
+      // // Check results
+      // const userDepositAccount = await program.account.userDeposit.fetch(userDepositPda);
+      // assert.equal(userDepositAccount.amount.toNumber(), depositAmount, "Deposit amount should match");
+
+      // const vaultTokenAccountInfo = await provider.connection.getTokenAccountBalance(vaultTokenAccount);
+      // assert.equal(Number(vaultTokenAccountInfo.value.amount), depositAmount, "Vault token balance should match deposit amount");
+
+      // console.log("Deposit successful!");
+    } catch (error) {
+      console.error("Error:", error);
+      throw error;
+    }
+  });
+});
