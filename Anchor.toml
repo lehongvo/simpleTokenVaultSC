@@ -2,7 +2,7 @@
 seeds = false
 skip-lint = false
 [programs.localnet]
-simple_token_vault = "2dftvFuYB5H7GFKerZUESaiN6pvqXJgFuqMcQkf6q5ZP"
+simple_token_vault = "FhS7jbiQLyDoWGyBmrxbAriedhN6H6vpCq4E26sU9Hvt"
 
 [registry]
 url = "https://api.apr.dev"

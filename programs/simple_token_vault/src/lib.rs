@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{self, Token, TokenAccount, Transfer};
 
-declare_id!("2dftvFuYB5H7GFKerZUESaiN6pvqXJgFuqMcQkf6q5ZP");
+declare_id!("FhS7jbiQLyDoWGyBmrxbAriedhN6H6vpCq4E26sU9Hvt");
 
 #[program]
 pub mod simple_token_vault {
@@ -18,6 +18,16 @@ pub mod simple_token_vault {
     }
 
     pub fn deposit(ctx: Context<Deposit>, amount: u64) -> Result<()> {
+        let user_deposit = &mut ctx.accounts.user_deposit;
+        let vault = &ctx.accounts.vault;
+
+        // Initialize user_deposit if needed
+        if user_deposit.user == Pubkey::default() {
+            user_deposit.user = ctx.accounts.user.key();
+            user_deposit.vault = vault.key();
+            user_deposit.amount = 0;
+        }
+
         let transfer_instruction = Transfer {
             from: ctx.accounts.user_token_account.to_account_info(),
             to: ctx.accounts.vault_token_account.to_account_info(),
@@ -32,7 +42,6 @@ pub mod simple_token_vault {
             amount,
         )?;
 
-        let user_deposit = &mut ctx.accounts.user_deposit;
         user_deposit.amount = user_deposit
             .amount
             .checked_add(amount)
@@ -57,7 +66,6 @@ pub mod simple_token_vault {
         let seeds = &[b"vault".as_ref(), &[vault.bump]];
         let signer = &[&seeds[..]];
 
-        // Transfer to user
         let transfer_instruction = Transfer {
             from: ctx.accounts.vault_token_account.to_account_info(),
             to: ctx.accounts.user_token_account.to_account_info(),
@@ -73,7 +81,6 @@ pub mod simple_token_vault {
             withdraw_amount,
         )?;
 
-        // Transfer fee to fee account
         if fee_amount > 0 {
             let fee_transfer_instruction = Transfer {
                 from: ctx.accounts.vault_token_account.to_account_info(),
@@ -128,7 +135,7 @@ pub struct Deposit<'info> {
     #[account(mut)]
     pub vault: Account<'info, Vault>,
     #[account(
-        init,
+        init_if_needed,
         payer = user,
         space = 8 + 32 + 32 + 8,
         seeds = [b"user_deposit", vault.key().as_ref(), user.key().as_ref()],
