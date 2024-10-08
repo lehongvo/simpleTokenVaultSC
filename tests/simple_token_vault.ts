@@ -90,10 +90,7 @@ describe('simple_token_vault', () => {
         vaultTokenAccountKeypair
       )
 
-      // Create user token account
 
-
-      // Mint tokens to user
       const depositAmount = 10000000000 // 10 token (assuming 9 decimals)
       const txMint = await mintTo(
         provider.connection,
@@ -174,7 +171,7 @@ describe('simple_token_vault', () => {
     const feeAmount = Math.floor(withdrawAmount * vaultAccount.fee.toNumber() / 10000);
     const expectedWithdrawAmount = withdrawAmount - feeAmount;
 
-    const txWithdraw = await program.methods
+    await program.methods
       .withdraw(new anchor.BN(withdrawAmount))
       .accounts({
         vault: vaultPda,
@@ -186,6 +183,9 @@ describe('simple_token_vault', () => {
         tokenProgram: TOKEN_PROGRAM_ID,
       })
       .rpc();
-    console.log('Withdraw transaction:', txWithdraw);
+
+    assert(userDepositAccountBefore.amount.toNumber() - withdrawAmount === userDepositAccountBefore.amount.toNumber(), 'User deposit amount should match');
+    assert(vaultTokenAccountInfoBefore.value.uiAmount - withdrawAmount === vaultTokenAccountInfoBefore.value.uiAmount, 'Vault token account balance should match');
+    assert(userTokenAccountInfoBefore.value.uiAmount + expectedWithdrawAmount === userTokenAccountInfoBefore.value.uiAmount, 'User token account balance should match');
   })
 })
