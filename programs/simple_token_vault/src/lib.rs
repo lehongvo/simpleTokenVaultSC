@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{self, Token, TokenAccount, Transfer};
 
-declare_id!("2dftvFuYB5H7GFKerZUESaiN6pvqXJgFuqMcQkf6q5ZP");
+declare_id!("FK18U5NeadZxUGcLgzjfeJnL6LedZYv3rsRdStXHfd8z");
 
 #[program]
 pub mod simple_token_vault {
@@ -137,7 +137,7 @@ pub struct Deposit<'info> {
     #[account(
         init_if_needed,
         payer = user,
-        space = 8 + 32 + 32 + 8,
+        space = 8 + 32 + 32 + 8 + 8,
         seeds = [b"user_deposit", vault.key().as_ref(), user.key().as_ref()],
         bump
     )]

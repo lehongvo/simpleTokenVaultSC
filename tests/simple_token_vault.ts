@@ -51,6 +51,7 @@ describe('simple_token_vault', () => {
 
   it("Initializes the vault", async () => {
     try {
+      console.log("mint", mint.toBase58().toString());
       await program.methods
         .initialize(new anchor.BN(fee))
         .accounts({
